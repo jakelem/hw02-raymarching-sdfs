@@ -8,19 +8,19 @@ The demo for this project currently doesn't work. I will update this once it doe
 For this project, I made a model of Bjork's Homogenic album cover. I used several different types of SDFs, mostly spheres, rounded boxes, and capped/rounded cones to create the base model. For details such as cloth folds and the upper lip, I used domain distortion functions such as quadratic curves and sin/cosine curves. For animation, I moved the folds of the dress along a sin curve; I used gain to modify the shape of these folds as they animate.
 
 <p align="center">
-<img src="Images/HomogenicSdf.png" alt="drawing" width="350"/>
+<img src="images/HomogenicSdf.png" alt="drawing" width="350"/>
 </p>
 <p align= "center">
 
 The original reference images can be seen below.
 
 <p align="center">
-<img src="Images/HomogenicReal.png" alt="drawing" width="350"/>
+<img src="images/HomogenicReal.png" alt="drawing" width="350"/>
 </p>
 <p align= "center">
 
 <p align="center">
-<img src="Images/HomogenicReal2.jpeg" alt="drawing" width="350"/>
+<img src="images/HomogenicReal2.jpeg" alt="drawing" width="350"/>
 </p>
 <p align= "center">
 
