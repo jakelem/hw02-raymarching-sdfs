@@ -20,7 +20,7 @@ The original reference images can be seen below.
 <p align= "center">
 
 <p align="center">
-<img src="Images/HomogenicReal2.png" alt="drawing" width="350"/>
+<img src="Images/HomogenicReal2.jpeg" alt="drawing" width="350"/>
 </p>
 <p align= "center">
 
