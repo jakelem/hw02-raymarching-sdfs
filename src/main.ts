@@ -1,6 +1,5 @@
 import {vec2, vec3} from 'gl-matrix';
-// import * as Stats from 'stats-js';
-// import * as DAT from 'dat-gui';
+//import * as Stats from 'stats-js';
 import Square from './geometry/Square';
 import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
 import Camera from './Camera';
@@ -38,15 +37,12 @@ function main() {
   }, false);
 
   // Initial display for framerate
-  // const stats = Stats();
+  //const stats = Stats();
   // stats.setMode(0);
   // stats.domElement.style.position = 'absolute';
   // stats.domElement.style.left = '0px';
   // stats.domElement.style.top = '0px';
-  // document.body.appendChild(stats.domElement);
-
-  // Add controls to the gui
-  // const gui = new DAT.GUI();
+  //document.body.appendChild(stats.domElement);
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -61,7 +57,7 @@ function main() {
   // Initial call to load scene
   loadScene();
 
-  const camera = new Camera(vec3.fromValues(0, 0, -10), vec3.fromValues(0, 0, 0));
+  const camera = new Camera(vec3.fromValues(0, -1, -28), vec3.fromValues(0, -9.5, 0));
 
   const renderer = new OpenGLRenderer(canvas);
   renderer.setClearColor(164.0 / 255.0, 233.0 / 255.0, 1.0, 1);
@@ -79,7 +75,7 @@ function main() {
   // This function will be called every frame
   function tick() {
     camera.update();
-    // stats.begin();
+    //stats.begin();
     gl.viewport(0, 0, window.innerWidth, window.innerHeight);
     renderer.clear();
     processKeyPresses();
@@ -87,7 +83,7 @@ function main() {
       square,
     ], time);
     time++;
-    // stats.end();
+    //stats.end();
 
     // Tell the browser to call `tick` again whenever it renders a new frame
     requestAnimationFrame(tick);
