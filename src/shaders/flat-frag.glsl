@@ -27,6 +27,13 @@ struct Material
     float displacement;
 };
 
+struct PointLight
+{
+    vec3 position;
+    vec3 color;
+    bool castsShadow;
+};
+
 float hash3(vec3 v)
 {
     return fract(sin(dot(v, vec3(24.51853, 4815.44774, 32555.33333))) * 3942185.3);
@@ -262,6 +269,8 @@ float getGain(float time,float gain)
     return getBias(time * 2.0 - 1.0,1.0 - gain)/2.0 + 0.5;
 }
 
+
+
 vec2 map(vec3 p)
 {
 //    if (abs(p.z) > 60.0 || abs(p.x) > 30.0 || abs(p.y) > 30.0)
@@ -270,21 +279,14 @@ vec2 map(vec3 p)
 //    }
     
     float modTime = mod(u_Time, 100.0 * pi);
-    MapQuery face2;
-    face2.dist = box(p - vec3(0.0,-7.4,0.0), vec3(9.0,14.0,9.0));
-    face2.material = 0.1;
-    
-    
-    vec2 face = vec2(box(p - vec3(0.0,-7.4,0.0), vec3(9.5,16.0,9.0)), 0.1);
-    
-    if(face.x < 0.0001) {
     vec3 symP = vec3(abs(p.x), p.yz);
     //TODO: calculate these matrices on CPU or vert shader
     mat3 rot = rotationAxisAngle(normalize(vec3(1.0, 0.0, 0.0)), degToRad * 10.0);
-    face = vec2(sphere(p + vec3(0.0, -0.8, 0.0), 1.2), 0.0);
+    vec2 face = vec2(sphere(p + vec3(0.0, -0.8, 0.0), 1.2), 0.0);
     vec3 rotP = rot * (p - vec3(0.0,0.9,-0.63));
     face = smin(face, vec2(ellipsoid(p - vec3(0.0,0.0,-0.4), vec3(1.15, 1.3, 1.0)), 0.0), 0.2);
-    face = smin(face, vec2(roundBox(rotP, vec3(0.6, 0.2, 0.55), 0.22), 0.0), 0.6);
+    // Forehead
+    face = smin(face, vec2(roundBox(rotP, vec3(0.6, 0.2, 0.55), 0.2), 0.0), 0.6);
     // Chin
     face = smin(face, vec2(sphere(p + vec3(0.0, 0.98, 0.89), 0.33), 0.0), 0.3);
     // Eye socket
@@ -307,7 +309,8 @@ vec2 map(vec3 p)
     vec3 eyeballPos = symP + vec3(-0.5, -0.44, 0.99);
     vec2 eyeball = vec2(sphere(eyeballPos, 0.19), 3.0);
     float pupilDist = length(eyeballPos.xy);
-    if(pupilDist < 0.08 && pupilDist > 0.04) {
+    // Iris
+    if(pupilDist < 0.08 && pupilDist > 0.045) {
         eyeball.y = 6.0;
     }
     face = smin(face, eyeball, 0.0);
@@ -315,11 +318,29 @@ vec2 map(vec3 p)
     // Cheekbones
     face = smin(face, vec2(stick(symP, vec3(0.92, 0.22, -0.64), vec3(0.52, -0.38, -0.84), 0.2, 0.25), 0.0), 0.24);
     // Hair Loop
+    vec3 earOffset = vec3(-0.1, 0.0, 0.16);
+    vec3 earP = elongate(symP + earOffset, vec3(0.05, 0.18, 0.1));
+    earP.x += 0.01 * sin(10.0 * symP.y);
+    earP.y += 0.02 * sin(5.0 * symP.y);
+
+    vec2 ear = vec2(roundCone(earP, vec3(1.1, 0.24, -0.06), vec3(0.96, 0.04, -0.16), 0.15, 0.14), 0.0);
+    face = smin(face, ear, 0.1);
+
+    earP = elongate(symP + earOffset, vec3(0.01, 0.21, 0.06));
+    earP.x += 0.01 * sin(20.0 * symP.y);
+    earP.z += 0.026 * sin(30.0 * symP.x);
+    
+    vec2 earCut = vec2(-roundCone(earP, vec3(1.29, 0.26, -0.06), vec3(1.26, 0.15, -0.16), 0.14, 0.19), 0.0);
+    face = smax(face, earCut, 0.1);
+
+    
     vec3 bentSymP = bend(symP, -0.7);
     rot = rotationAxisAngle(normalize(vec3(0.8, 0.0, 1.0)), -degToRad * 60.0);
+    
     vec3 rotSymP = rot * (symP + vec3(-1.7, -2.4, -0.3));
     rotSymP = bend(rotSymP, 0.05);
     rotSymP += 0.05 * sin(length(rotSymP * 4.0)) + 0.05 * cos(p * 3.5);
+
     vec2 hair = vec2(roundedCylinder(rotSymP, 1.1, 0.3, 0.1), 1.0);
     
     //scalp hair
@@ -331,7 +352,6 @@ vec2 map(vec3 p)
     face = smin(face, neck, 0.1);
     
     //lips
-    //vec3 bent = bend(symP + vec3(-0.1, 0.5, 1.14), -5.8);
     vec3 lipPos = p + vec3(0.0, 0.49, 1.18);
     float xStretch = lipPos.x * 9.0;
     
@@ -384,7 +404,9 @@ vec2 map(vec3 p)
 
     robeP.z += fold;
     robeP = elongate(robeP, vec3(1.0, 0.0, 0.0));
-
+        
+        
+        
     vec2 robe = vec2(cappedCone(robeP, vec3(0.0, 2.6, 0.4), vec3(0.0, -3.4, -0.5), 2.4, 1.4), 5.0);
     if (robe.x < 0.0) {
         robe.y = 4.0;
@@ -429,13 +451,13 @@ vec2 map(vec3 p)
     //robe = smin(robe, bicep, 0.2);
     vec3 sleeveP = symP - vec3(4.0, -6.0, -0.7);
     sleeveP += 0.03 * (sin(0.3 * modTime + p.x * 3.0 + p.y) + 1.0);
-        sleeveP += 0.04 * sin(p.x * 2.7  + p.y * 3.0 + p.z * 1.0);
+    sleeveP += 0.04 * sin(p.x * 2.7  + p.y * 3.0 + p.z * 1.0);
     vec2 sleeve = vec2(cappedCone(sleeveP, vec3(0.0, 0.0, -0.6), vec3(-4.4, -0.8, -4.0), 0.9, 1.8), 5.0);
     if (sleeve.x < 0.0) {
         sleeve.y = 4.0;
     }
     
-    sleeve.x = onion(sleeve.x, 0.1);
+    sleeve.x = onion(sleeve.x, 0.09);
     rot = rotationAxisAngle(vec3(0.0, 1.0, 0.0), -degToRad * 10.0);
     
     // Cut out sleeves using box
@@ -448,7 +470,6 @@ vec2 map(vec3 p)
     longP = p - vec3(-4.0, -6.0, -0.7);
     
     vec2 lWrist = vec2(cappedCone(p - vec3(4.0, -5.2, -1.5), vec3(-3.0, -0.4, -1.7), vec3(-5.4, -0.4, -2.5), 0.3, 0.4), 0.0);
-
     vec2 rWrist = vec2(cappedCone(p - vec3(-4.0, -5.3, -1.6), vec3(3.0, -0.6, -1.8), vec3(5.4, -0.4, -1.5), 0.4, 0.4), 0.0);
 
     sleeve = smin(lWrist, sleeve, 0.01);
@@ -462,17 +483,34 @@ vec2 map(vec3 p)
     robe = smax(robe, vec2(-roundBox(clothP, vec3(4.0, 2.9, 4.5), 0.01), 0.0), 0.01);
     rot = rotationAxisAngle(vec3(0.0, 0.0, 1.0), degToRad *  45.0);
     rotP = rot * (p - vec3(0.0, 1.0, -1.2) + robeOffset);
+        rotP += 0.02 * sin(0.3 + p.x * 2.0 + p.y * 3.2);
+        rotP += 0.02 * sin(0.9 + p.x * 2.0 - p.y * 1.2);
+
     //Cut out vneck
     robe = smax(robe, vec2(-roundBox(rotP, vec3(3.5, 3.5, 1.0), 0.01), 0.0), 0.01);
     face = smin(face, robe, 0.01);
+      /*
+    vec2 testSphere = vec2(sphere(symP - vec3(2.0, 2.5, 0.0), 0.3), 0.0);
+        face = smin(face, testSphere, 0.01);*/
+        return face;
+
+    
+}
+
+vec2 boundedMap(vec3 p)
+{
+    vec2 boundingBox = vec2(box(p - vec3(0.0,-7.4,0.0), vec3(9.5,16.0,9.0)), 0.0);
+    if(boundingBox.x < 0.001) {
+        return map(p);
     }
-    return face;
+    return boundingBox;
+
 }
 
 vec3 calcNormals(vec3 p)
 {
     float epsilon = 0.00001;
-    return normalize(vec3(map(p + vec3(epsilon, 0.0, 0.0)).x - map(p - vec3(epsilon, 0.0, 0.0)).x, map(p + vec3(0.0, epsilon, 0.0)).x - map(p - vec3(0.0, epsilon, 0.0)).x, map(p + vec3(0.0, 0.0, epsilon)).x - map(p - vec3(0.0, 0.0, epsilon)).x));
+    return normalize(vec3(boundedMap(p + vec3(epsilon, 0.0, 0.0)).x - boundedMap(p - vec3(epsilon, 0.0, 0.0)).x, boundedMap(p + vec3(0.0, epsilon, 0.0)).x - boundedMap(p - vec3(0.0, epsilon, 0.0)).x, boundedMap(p + vec3(0.0, 0.0, epsilon)).x - boundedMap(p - vec3(0.0, 0.0, epsilon)).x));
     
 }
 
@@ -483,9 +521,9 @@ vec4 raycast(vec3 origin, vec3 dir, int maxSteps)
     for(int i = 0; i < maxSteps; ++i)
     {
         vec3 p = origin + t * dir;
-        vec2 dist = map(p);
+        vec2 dist = boundedMap(p);
 
-        if (abs(dist.x) < 0.0001) {
+        if (abs(dist.x) < 0.001) {
             return vec4(p, dist.y);
         }
         
@@ -497,6 +535,32 @@ vec4 raycast(vec3 origin, vec3 dir, int maxSteps)
     }
     
     return vec4(0.0, 0.0, 0.0, -100.0);
+}
+
+float softShadow(vec3 origin, vec3 dir, float minT, float maxT, float k)
+{
+    float res = 1.0;
+    float ph = 1e20;
+
+    for(float t = minT; t < maxT; )
+    {
+        vec3 p = origin + t * dir;
+        vec2 dist = map(p);
+        if (abs(dist.x) < 0.0001) {
+            return 0.0;
+        }
+        /*
+        float y = dist.x*dist.x/(2.0*ph);
+        float d = sqrt(dist.x*dist.x-y*y);
+        res = min( res, k*d/max(0.0,t-y) );
+        ph = dist.x;*/
+        res = min( res, k * dist.x / t );
+        t += dist.x;
+
+    }
+    
+    return res;
+
 }
 
 float flower(vec2 p, float r, float numPetals, float petalSize, float rotation)
@@ -557,15 +621,15 @@ Material robePattern(vec2 uv)
     res = min(res, flower(centerUv - vec2(0.3 * growthSign, -0.2), 0.5, 2.5, petalGrowth * 0.8, growthTime));
     res = min(res, (res, flower(centerUv - vec2(0.1 * growthSign, 0.4), 0.8, 2.5, petalGrowth * 0.9, growthTime)));
     
-    matRes.color = vec3(198.0,214.0,240.0) / 255.0;
+    matRes.color = vec3(198.0,211.0,240.0) / 255.0;
     matRes.kd = 0.9;
     matRes.ks = 0.3;
     matRes.cosPow = 5.0;
     matRes.displacement = -0.8 * fbm.x;
     if (res < 0.0001) {
         matRes.kd = 1.0;
-        matRes.ks = 1.3;
-        matRes.cosPow = 30.0;
+        matRes.ks = 1.0;
+        matRes.cosPow = 40.0;
         matRes.displacement += -20.0 * abs(res);
         matRes.color =  mix(vec3(78.0,130.0,200.0) / 255.0, vec3(88.0,163.0,240.0) / 255.0, (uv.y));
     }
@@ -595,7 +659,7 @@ vec3 calcRobeNormals(vec2 uv)
     Material up = robePattern(vec2(uv.x, uv.y - epsilon));
     Material down = robePattern(vec2(uv.x, uv.y + epsilon));
     
-    float dzdx = (right.displacement - right.displacement) * 0.5;
+    float dzdx = (right.displacement - left.displacement) * 0.5;
     float dzdy = (up.displacement - down.displacement) * 0.5;
     
     return normalize(vec3(-dzdx, -dzdy, 1.0f));
@@ -609,12 +673,13 @@ Material beltPattern(vec2 uv)
 
     float threshold = abs(cos(uv.x * 10.0));
     float dispThreshold = 2.0 * (threshold - 0.5);
-    matRes.displacement = fbm.x * 10.0;
+    matRes.displacement = fbm.x * 3.0;
     if (threshold > 0.3) {
         matRes.ks = 1.0;
         matRes.kd = 1.0;
         matRes.cosPow = 20.0;
         matRes.color = vec3(0.62, 0.43, 0.6);
+        matRes.displacement += (threshold - 0.3) * 10.0;
 
     } else {
         matRes.kd = 0.9;
@@ -622,10 +687,10 @@ Material beltPattern(vec2 uv)
         matRes.color = vec3(0.9, 0.54, 0.5);
         matRes.cosPow = 60.0;
 
-        //matRes.displacement += (dispThreshold) * 1000.0;
+        matRes.displacement += (0.3 - threshold) * 10.0;
     }
-    matRes.displacement += -(threshold);
-    matRes.displacement += -sin((1.2 * uv.x + uv.y) * 20.0);
+    //matRes.displacement += 20.0 * -(threshold);
+    matRes.displacement += -4.0 * getBias(abs(sin((1.2 * uv.x + uv.y) * 10.0)), 0.8);
 
     //matRes.displacement = dispThreshold * 100.0;
    // matRes.color = vec3(threshold * threshold * threshold * threshold);
@@ -640,7 +705,42 @@ vec3 calcBeltNormals(vec2 uv)
     Material up = beltPattern(vec2(uv.x, uv.y - epsilon));
     Material down = beltPattern(vec2(uv.x, uv.y + epsilon));
     
-    float dzdx = (right.displacement - right.displacement) * 0.5;
+    float dzdx = (right.displacement - left.displacement) * 0.5;
+    float dzdy = (up.displacement - down.displacement) * 0.5;
+    
+    return normalize(vec3(-dzdx, -dzdy, 1.0f));
+
+}
+
+Material hairPattern(vec2 uv)
+{
+    Material resMat;
+    resMat.color = vec3(0.18, 0.16, 0.21);
+    resMat.ks = 1.3;
+    resMat.cosPow = 8.0;
+    resMat.kd = 0.2;
+    /*
+    resMat.displacement = 0.4 * mod(uv.x * 7.0, 1.5);
+    resMat.displacement += 0.3 * mod(pi + uv.x * 9.0, 1.9);
+    resMat.displacement += 0.5 * mod(1.6 * pi + uv.x * 7.9, 2.1);
+*/
+    resMat.displacement = getBias(abs(0.3 * sin(uv.x * 26.0 + uv.y * 4.4)), 0.77);
+    resMat.displacement += getBias(abs(0.2 * sin(pi * 0.9 + uv.x * 27.0 + uv.y * 4.3)), 0.8);
+    resMat.displacement += 0.5 * sin(1.6 * pi + uv.x * 26.0 + uv.y * 4.3);
+
+    return resMat;
+    
+}
+
+vec3 calcHairNormals(vec2 uv)
+{
+    float epsilon = 0.01;
+    Material left = hairPattern(vec2(uv.x - epsilon, uv.y));
+    Material right = hairPattern(vec2(uv.x + epsilon, uv.y));
+    Material up = hairPattern(vec2(uv.x, uv.y - epsilon));
+    Material down = hairPattern(vec2(uv.x, uv.y + epsilon));
+    
+    float dzdx = (right.displacement - left.displacement) * 0.5;
     float dzdy = (up.displacement - down.displacement) * 0.5;
     
     return normalize(vec3(-dzdx, -dzdy, 1.0f));
@@ -661,22 +761,28 @@ void main() {
     vec3 p = u_Ref + fs_Pos.x * h + fs_Pos.y * v;
     vec3 dir = normalize(p - u_Eye);
     
-    vec3 lightPos = vec3(1.0, 4.6, -20.0);
+    vec3 lightPos = vec3(1.0, 0.6, -20.0);
     
+    PointLight[3] pointLights;
+    pointLights[0] = PointLight(vec3(1.0, 20.0, -50.0), 0.9 * vec3(1.08,1.05,1.06), true);
+    pointLights[1] = PointLight(vec3(-100.0, 0.6, 6.0), 0.75 * vec3(0.2,0.3,0.38), false);
+    pointLights[2] = PointLight(vec3(80.0, 0.6, 4.0), 0.77 * vec3(0.2,0.3,0.4), false);
+
     vec4 isect = raycast(u_Eye, dir, 128);
     float a = getBias((fs_Pos.y + 1.0) * 0.5, 0.3);
-    vec3 col = mix(vec3(147.0,157.0,182.0) / 255.0, vec3(226.0,234.0,236.0) / 255.0, a);
+    
+    // Clear color
+    vec3 albedo = mix(vec3(147.0,157.0,182.0) / 255.0, vec3(226.0,234.0,236.0) / 255.0, a);
+    vec3 col = albedo;
     if(isect.w >= 0.0)
     {
-        vec3 lightVec = normalize(lightPos - isect.xyz);
+        col = vec3(0.0);
         vec3 normal = calcNormals(isect.xyz);
         vec3 tangent = normalize(cross(vec3(0,1,0),normal));
         vec3 bitangent = normalize(cross(normal, tangent));
 
         mat3 tbn = mat3(tangent, bitangent, normal);
-        float ambient = 0.2;
         vec3 viewVec = normalize(isect.xyz - u_Eye.xyz);
-        vec3 h = normalize(lightVec - viewVec);
         float kd = 1.0;
         float ks = 1.0;
         float cosPow = 28.0;
@@ -684,62 +790,88 @@ void main() {
         if(isect.w == 0.0)
         {
             // Skin
-            ks = 0.1;
+            ks = 0.2;
+            
             float skinLerp = clamp(abs(isect.z * 1.2) - 0.9, 0.0, 1.0);
             skinLerp = getBias(skinLerp, 0.6);
             
-            vec3 cheeks = vec3(0.6, -0.1, -0.74);
+            albedo = vec3(0.7, 0.62, 0.67);
+
+            vec3 cheeks = vec3(0.6, -0.19, -0.74);
             vec3 symIsect = vec3(abs(isect.x), isect.yz);
             float cheekDist = distance(cheeks, symIsect);
             cheekDist = clamp(cheekDist * 1.3, 0.0, 1.0);
-            col = vec3(0.8, 0.73, 0.76);
-            col = mix(vec3(0.7, 0.43, 0.6), col, cheekDist);
+            albedo = mix(vec3(0.72, 0.42, 0.62), albedo, cheekDist);
 
-            vec3 temples = vec3(0.76, 1.1, -0.6);
-            float templeDist = clamp(distance(temples, symIsect) * 1.0, 0.0, 1.0);
-            col = mix(vec3(0.5, 0.33, 0.47), col, templeDist);
+            cheeks = vec3(1.1, -0.36, -0.7);
+            cheekDist = clamp(distance(cheeks, symIsect) * 1.5,0.0,1.0);
+            albedo = mix(vec3(0.56, 0.41, 0.51), albedo, cheekDist);
+            
+            vec3 temples = vec3(0.85, 1.1, -1.09);
+            float templeDist = clamp(distance(temples, symIsect) * 1.5, 0.0, 1.0);
+            albedo = mix(vec3(0.3, 0.19, 0.4), albedo, templeDist);
 
             vec3 chest = vec3(0.0, -1.8, -0.6);
             float chestDist = clamp(distance(chest, symIsect) * 0.8, 0.0, 1.0);
-            col = mix(vec3(0.6, 0.33, 0.67), col, chestDist);
+            albedo = mix(vec3(0.6, 0.33, 0.67), albedo, chestDist);
             chestDist = clamp(distance(chest - vec3(0.0, 2.6, 0.0), symIsect) * 0.8, 0.0, 1.0);
-            col = mix(vec3(0.6, 0.33, 0.67), col, chestDist);
+            albedo = mix(vec3(0.6, 0.33, 0.67), albedo, chestDist);
 
-            //col = vec3(0.7, 0.58, 0.66);
-
-            cosPow = 40.0;
+            cosPow = 60.0;
         } else if (isect.w <= 1.0) {
             //hair
-            cosPow = 4.0;
-            kd = 0.2;
-            ks = 1.0;
-            col = vec3(0.2, 0.2, 0.2);
+            vec3 symIsect = vec3(abs(isect.x), isect.yz);
 
+            vec3 hairCenter = vec3(1.8, 2.5, 0.0);
+            float hairDist = clamp(distance(hairCenter, symIsect) * 0.7, 0.0, 1.0);
+            albedo = mix(vec3(0.8, 0.0, 0.0), vec3(0.0,0.8,0.0), hairDist);
+
+            vec3 hairVector = symIsect.xyz - hairCenter;
+            vec3 xAxis = normalize(-vec3(0.69512, 0.67625, 0.2439));
+            xAxis = normalize(-vec3(1.0, 0.0, 0.0));
+
+            float angle = acos(dot(normalize(hairVector.xy), xAxis.xy));
+            float d = length(hairVector);
+            
+            albedo = vec3(mod(angle * 12.0, 2.0));
+            vec2 uv = vec2(angle, d);
+            Material hairMat = hairPattern(vec2(uv));
+            albedo = hairMat.color;
+            normal = tbn * calcHairNormals(uv);
+            cosPow = hairMat.cosPow;
+            kd = hairMat.kd;
+            ks = hairMat.ks;
+            //albedo = normal;
+            //albedo = vec3(hairMat.displacement);
         } else if (isect.w <= 2.0) {
             // Neck
-            kd = 0.2;
-            ks = 1.3;
+            vec4 fbm = fbm3(isect.xyz, 3, 1.0, 9.1, 0.5, 2.4);
+
+            kd = 0.1;
+            ks = 0.9 + 0.6 * (fbm.x + 1.0);
             cosPow = 12.0;
-            col = vec3(0.7, 0.57, 0.1);
+            albedo = vec3(0.7, 0.57, 0.1);
         } else if (isect.w <= 3.0) {
-            col = vec3(0.2, 0.2, 0.2);
+            // Eyes
+            albedo = vec3(0.2, 0.2, 0.2);
 
         } else if (isect.w <= 4.0) {
-            // Lips
+            // Lips , red dress
             vec4 fbm = fbm3(isect.xyz, 3, 1.0, 1.1, 0.4, 2.0);
 
             cosPow = 3.0;
+            
             ks = 0.5*(fbm.x + 1.0);
             ks = getBias(ks, 0.4) * 2.6;
 
             kd = 0.4;
-            col = vec3(183.0, 24.0, 42.0) / 255.0;
+            albedo = vec3(183.0, 24.0, 42.0) / 255.0;
 
         } else if (isect.w <= 5.0) {
             // dress, eyes
             kd = 0.9;
             ks = 1.2;
-            col = vec3(226.0,234.0,236.0) / 255.0;
+            albedo = vec3(226.0,234.0,236.0) / 255.0;
             float freqTime = abs(sin(modTime * 0.01)) * 0.5 + 1.9;
             
             vec3 uv = isect.xyz;
@@ -753,17 +885,17 @@ void main() {
             float angle = acos(dot(normalize(uv), vec3(1.0,0.0,0.0)));
             angle += pi;
             vec2 uvAngle = vec2(angle, uv.y);
-            
-            if(fract(uv.y) > 0.1 && fract(uv.y) < 0.9) {
-                if(abs(cos(angle * 6.3)) < 0.5) {
-                    col = vec3(177.0,180.0,210.0) / 255.0;
-                }
-            }
+//
+//            if(fract(uv.y) > 0.1 && fract(uv.y) < 0.9) {
+//                if(abs(cos(angle * 6.3)) < 0.5) {
+//                    albedo = vec3(177.0,180.0,210.0) / 255.0;
+//                }
+//            }
             uvAngle.x = fract(-0.02 + 0.79 * uvAngle.x);
             Material dressMat = robePattern(uvAngle);
             vec3 patternNorm = calcRobeNormals(uvAngle);
             normal = tbn * patternNorm;
-            col = dressMat.color;
+            albedo = dressMat.color;
             ks = dressMat.ks;
             kd = dressMat.kd;
             cosPow = dressMat.cosPow;
@@ -775,7 +907,7 @@ void main() {
 
         } else if (isect.w <= 6.0) {
             //  eyes
-            col = vec3(177.0,180.0,210.0) / 255.0;
+            albedo = vec3(177.0,180.0,210.0) / 255.0;
 
         } else if (isect.w <= 7.0) {
             //  belt
@@ -790,23 +922,27 @@ void main() {
 
             ks = mat.ks;
             kd = mat.kd;
-            col = mat.color;
+            albedo = mat.color;
             cosPow = mat.cosPow;
         }
 
-        float diffuse = clamp(dot(normal, lightVec), 0.0, 1.0);
-        float specularIntensity = max(pow(max(dot(h, normal), 0.f), cosPow), 0.f);
-
-        vec4 shadow = raycast(isect.xyz + normal * 0.001, lightVec, 120);
-        //vec4 shadow = vec4(0.0);
-        if (shadow.w >= 0.0) {
-            diffuse = 0.0;
-            specularIntensity = 0.0;
+        for (int i = 0; i < 3; ++i) {
+            vec3 lightVec = normalize(pointLights[i].position - isect.xyz);
+            vec3 h = normalize(lightVec - viewVec);
+            float diffuse = clamp(dot(normal, lightVec), 0.0, 1.0);
+            float specularIntensity = max(pow(max(dot(h, normal), 0.f), cosPow), 0.f);
+            
+            float shadow = 1.0;
+            if (pointLights[i].castsShadow) {
+                shadow = softShadow(isect.xyz + normal * 0.04, lightVec, 0.02, 4.5, 32.0);
+            }
+            
+            vec3 lightIntensity = shadow * pointLights[i].color * clamp(kd * diffuse + ks * specularIntensity, 0.0, 2.7);
+            col += lightIntensity * albedo;
         }
-
-        float lightIntensity = clamp(ambient + kd * diffuse + ks * specularIntensity, 0.0, 2.7);
-        col = lightIntensity * col;
-
+        
+        // Diffuse Light
+        col += vec3(0.20, 0.21, 0.23) * albedo;
     }
         
     out_Col = vec4(col, 1.0);
